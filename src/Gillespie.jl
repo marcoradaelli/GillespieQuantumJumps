@@ -26,7 +26,6 @@ end
 function gillespie(
     H::Matrix{ComplexF64},
     M_l::Vector{Matrix{ComplexF64}},
-    dθ::Float64,
     ψ0::Vector{ComplexF64},
     t_final::Float64,
     dt::Float64,
@@ -165,14 +164,13 @@ end
 function compute_states_at_times(
     H::Matrix{ComplexF64},
     M_l::Vector{Matrix{ComplexF64}},
-    dθ::Float64,
     ψ0::Vector{ComplexF64},
     t_final::Float64,
     dt::Float64,
     number_trajectories::Int64,
     verbose::Bool=True)
 
-    trajectories_results, V, t_range = gillespie(H, M_l, dθ, ψ0, t_final, dt, number_trajectories, verbose)
+    trajectories_results, V, t_range = gillespie(H, M_l, ψ0, t_final, dt, number_trajectories, verbose)
     println()
 
     results = Vector{Vector{ComplexF64}}[]
