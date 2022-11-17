@@ -115,7 +115,7 @@ function gillespie(
         push!(trajectories_results, results)
     end
 
-    return trajectories_results, V, Vdot, t_range
+    return trajectories_results, V, t_range
 end
 
 function state_at_time_on_trajectory(
