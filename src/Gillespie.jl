@@ -61,7 +61,8 @@ Simulates the jumps, according to the Gillespie algorithm, for the given dynamic
 - `ψ0`: initial state of the system
 - `t_final`: final time of the evolution
 - `dt`: time increment considered
-- 
+- `number_trajectories`: number of trajectories of the simulation
+- `verbose`: if true, gives more output. Verbose=true for large simulations can fill up completely the text buffer and cause a crash.
 """
 function gillespie(
     H::Matrix{ComplexF64},
