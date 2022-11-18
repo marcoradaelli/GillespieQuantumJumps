@@ -10,13 +10,13 @@ using ProgressMeter
 """
      verify_working() 
      
-Verifies whether the library has been imported correctly. When called, prints "The package has been imported correctly" and returns true.
+Verifies whether the library has been imported correctly. When called, prints "The package has been imported correctly" and a version number and returns true.
 
 # Returns
 - true
 """
 function verify_working()
-    println("The package has been imported correctly")
+    println("The package has been imported correctly, version 0.2")
     return true
 end
 
