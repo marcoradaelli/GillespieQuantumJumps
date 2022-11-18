@@ -8,4 +8,4 @@ Open a Julia terminal session, then press `]` to enter the `Packages` REPL. Inse
 ```
 add "https://github.com/marcoradaelli/GillespieQuantumJumps.git"
 ```
-
+and the package will be installed. For further instructions on how to manage Julia packages, see [here](https://docs.julialang.org/en/v1/stdlib/Pkg/).
