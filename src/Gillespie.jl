@@ -30,7 +30,7 @@ function gillespie(
     t_final::Float64,
     dt::Float64,
     number_trajectories::Int64,
-    verbose::Bool=True)
+    verbose::Bool=false)
 
     t_range = 0.:dt:t_final
 
@@ -166,6 +166,64 @@ function state_at_time_on_trajectory(
     return v_states
 end
 
+function expectation_at_time_on_trajectory(
+    t_range::StepRangeLen{Float64, Base.TwicePrecision{Float64}, Base.TwicePrecision{Float64}, Int64},
+    relevant_times::StepRangeLen{Float64, Base.TwicePrecision{Float64}, Base.TwicePrecision{Float64}, Int64},
+    V::Vector{Matrix{ComplexF64}},
+    trajectory_data::Vector{Dict{String, Any}},
+    E_l::Vector{Matrix{ComplexF64}})
+
+    # Creates an array of expectation values for each operator.
+    expectations_v = []
+    for E in E_l
+        v = zeros(length(relevant_times))
+        push!(expectations_v, v)
+    end
+    
+    # Creates an array of jump times.
+    jump_times = [trajectory_data[i]["AbsTime"] for i in eachindex(trajectory_data)]
+    # Creates an array of states after the jumps.
+    ψ_after_jumps = [trajectory_data[i]["ψAfter"] for i in eachindex(trajectory_data)]
+    
+    # Cycles over the jumps times.
+    for n_jump in 1:length(jump_times)-1
+        next_jump_time = jump_times[n_jump + 1]
+        # Determines the set of relevant times between this jump and the following one.
+        relevant_times_in_interval = [t for t in relevant_times if jump_times[n_jump] <= t < next_jump_time]
+        # Cycles over the relevant times.
+        for t_abs in relevant_times_in_interval
+            ψ = ψ_after_jumps[n_jump]
+            n_t = find_nearest(t_range, t_abs - jump_times[n_jump])[1]
+            norm = sqrt(ψ' * V[n_t]' * V[n_t] * ψ)
+            ψ = V[n_t] * ψ
+            ψ = ψ / norm
+            # Cycles over the operators to compute the expectation values.
+            for n_E in eachindex(E_l)
+                exp_val = ψ' * E_l[n_E] * ψ
+                expectations_v[n_E][n_t] = exp_val
+            end
+        end
+    end
+
+    # Now computes the state for all times after the latest jump.
+    last_jump_absolute_time = last(jump_times)
+    relevant_times_after_last_jump = [t for t in relevant_times if t >= last_jump_absolute_time]
+    for t_abs in relevant_times_after_last_jump
+        ψ = last(ψ_after_jumps)
+        n_t = find_nearest(t_range, t_abs - last_jump_absolute_time)[1]
+        norm = sqrt(ψ' * V[n_t]' * V[n_t] * ψ)
+        ψ = V[n_t] * ψ
+        ψ = ψ / norm
+        # Cycles over the operators to compute the expectation values.
+        for n_E in eachindex(E_l)
+            exp_val = ψ' * E_l[n_E] * ψ
+            expectations_v[n_E][n_t] = exp_val
+        end
+    end
+
+    return expectations_v
+end
+
 function compute_states_at_times(
     H::Matrix{ComplexF64},
     M_l::Vector{Matrix{ComplexF64}},
@@ -173,7 +231,7 @@ function compute_states_at_times(
     t_final::Float64,
     dt::Float64,
     number_trajectories::Int64,
-    verbose::Bool=True)
+    verbose::Bool=false)
 
     trajectories_results, V, t_range = gillespie(H, M_l, ψ0, t_final, dt, number_trajectories, verbose)
     println()
@@ -183,6 +241,32 @@ function compute_states_at_times(
     @showprogress 1 "Filling in the gaps..." for n_trajectory in eachindex(trajectories_results)
         v_states = state_at_time_on_trajectory(t_range, t_range, V, trajectories_results[n_trajectory])
         push!(results, v_states)
+    end
+
+    return results
+end
+
+function compute_expectation_values_at_times(
+    H::Matrix{ComplexF64},
+    M_l::Vector{Matrix{ComplexF64}},
+    E_l::Vector{Matrix{ComplexF64}},
+    ψ0::Vector{ComplexF64},
+    t_final::Float64,
+    dt::Float64,
+    number_trajectories::Int64,
+    verbose::Bool=false)
+
+    # The operators of which the expectation value has to be computed have to be passed as the list E_l.
+
+    # Gillespie evolution.
+    trajectories_results, V, t_range = gillespie(H, M_l, ψ0, t_final, dt, number_trajectories, verbose)
+
+    results = []
+
+    # Holes filling and computation of expectation values.
+    @showprogress 1 "Filling in the gaps..." for n_trajectory in eachindex(trajectories_results)
+        v_expectations = expectation_at_times_on_trajectory(t_range, t_range, V, trajectories_results[n_trajectory], E_l)
+        push!(results, v_expectations)
     end
 
     return results
