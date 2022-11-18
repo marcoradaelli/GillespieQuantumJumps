@@ -5,4 +5,7 @@ At the moment, the repository is set as private. In the Julia documentation, it 
 
 ## Installation instructions
 Open a Julia terminal session, then press `]` to enter the `Packages` REPL. Insert the command:
-  add "
+```
+add "https://github.com/marcoradaelli/GillespieQuantumJumps.git"
+```
+
