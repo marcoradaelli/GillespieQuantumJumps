@@ -239,6 +239,7 @@ end
         E_l::Vector{Matrix{ComplexF64}})
 
 Taking as input the output of the `gillespie` function, computes the expectation values of operators along the trajectory.
+THIS FUNCTION HAS A RELEVANT BUG, STILL UNDER TEST
 
 # Arguments
 - `t_range`: range of times at which the V operators are computed
@@ -367,8 +368,8 @@ end
         verbose::Bool=false)
 
 Function for external access, computes the expectation values of all the required operators at the specified times.
-NOT TESTED
-
+THIS FUNCTION HAS A RELEVANT BUG, STILL UNDER TEST
+    
 # Arguments
 - `H`: system Hamiltonian
 - `M_l`: list of jump operators
