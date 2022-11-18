@@ -8,7 +8,7 @@ using Polynomials
 using ProgressMeter
 
 """
-     verify_working()
+     verify_working() 
      
 Verifies whether the library has been imported correctly. When called, prints "The package has been imported correctly" and returns true.
 
@@ -43,6 +43,26 @@ function find_nearest(a,x)
     return first(searchsorted(a,a[last(r)])):last(searchsorted(a,a[first(r)]))
 end
 
+"""
+    gillespie(
+        H::Matrix{ComplexF64},
+        M_l::Vector{Matrix{ComplexF64}},
+        ψ0::Vector{ComplexF64},
+        t_final::Float64,
+        dt::Float64,
+        number_trajectories::Int64,
+        verbose::Bool=false)
+
+Simulates the jumps, according to the Gillespie algorithm, for the given dynamics.
+
+# Arguments
+- `H`: Hamiltonian matrix
+- `M_l`: list of jump operators
+- `ψ0`: initial state of the system
+- `t_final`: final time of the evolution
+- `dt`: time increment considered
+- 
+"""
 function gillespie(
     H::Matrix{ComplexF64},
     M_l::Vector{Matrix{ComplexF64}},
