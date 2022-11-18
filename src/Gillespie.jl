@@ -62,7 +62,12 @@ Simulates the jumps, according to the Gillespie algorithm, for the given dynamic
 - `t_final`: final time of the evolution
 - `dt`: time increment considered
 - `number_trajectories`: number of trajectories of the simulation
-- `verbose`: if true, gives more output. Verbose=true for large simulations can fill up completely the text buffer and cause a crash.
+- `verbose`: if true, gives more output. Verbose=true for large simulations can fill up completely the text buffer and cause a crash
+
+# Returns
+- `trajectories_results`: list of dictionaries with each jump channel, times and states after jumps
+- `V`: list of pre-computed no-jump non-Hermitian evolution operators
+- `t_range`: range of times at which the V operators are computed
 """
 function gillespie(
     H::Matrix{ComplexF64},
@@ -162,6 +167,24 @@ function gillespie(
     return trajectories_results, V, t_range
 end
 
+"""
+    state_at_time_on_trajectory(
+        t_range::StepRangeLen{Float64, Base.TwicePrecision{Float64}, Base.TwicePrecision{Float64}, Int64},
+        relevant_times::StepRangeLen{Float64, Base.TwicePrecision{Float64}, Base.TwicePrecision{Float64}, Int64},
+        V::Vector{Matrix{ComplexF64}},
+        trajectory_data::Vector{Dict{String, Any}})
+
+Taking as input the output of the `gillespie` function, fills the gaps between the jumps.
+
+# Arguments
+- `t_range`: range of times at which the V operators are computed
+- `relevant_times`: list of times at which the state has to be computed (can also not coincide with `t_range`)
+- `V`: list of non-Hermitian evolution operators, computed at times specified in `t_range`
+- `trajectory_data`: a list of dictionaries in the form output by the `gillespie` function
+
+# Returns 
+- `v_states`: vector of quantum pure states (in vector form) at each of the times requested in `relevant_times`
+"""
 function state_at_time_on_trajectory(
     t_range::StepRangeLen{Float64, Base.TwicePrecision{Float64}, Base.TwicePrecision{Float64}, Int64},
     relevant_times::StepRangeLen{Float64, Base.TwicePrecision{Float64}, Base.TwicePrecision{Float64}, Int64},
@@ -207,6 +230,27 @@ function state_at_time_on_trajectory(
     return v_states
 end
 
+"""
+    expectation_at_time_on_trajectory(
+        t_range::StepRangeLen{Float64, Base.TwicePrecision{Float64}, Base.TwicePrecision{Float64}, Int64},
+        relevant_times::StepRangeLen{Float64, Base.TwicePrecision{Float64}, Base.TwicePrecision{Float64}, Int64},
+        V::Vector{Matrix{ComplexF64}},
+        trajectory_data::Vector{Dict{String, Any}},
+        E_l::Vector{Matrix{ComplexF64}})
+
+Taking as input the output of the `gillespie` function, computes the expectation values of operators along the trajectory.
+
+# Arguments
+- `t_range`: range of times at which the V operators are computed
+- `relevant_times`: list of times at which the state has to be computed (can also not coincide with `t_range`)
+- `V`: list of non-Hermitian evolution operators, computed at times specified in `t_range`
+- `trajectory_data`: a list of dictionaries in the form output by the `gillespie` function
+- `E_l`: list of Hermitian measurement operators of which the expectation value has to be computed
+
+# Returns
+- `expectations_v`: list of lists of expectation values for all operators and times, such that `expectations_v[n_E][n_t]` is the expectation value for the operator indexed as n_E at time indexed by n_t.
+
+"""
 function expectation_at_time_on_trajectory(
     t_range::StepRangeLen{Float64, Base.TwicePrecision{Float64}, Base.TwicePrecision{Float64}, Int64},
     relevant_times::StepRangeLen{Float64, Base.TwicePrecision{Float64}, Base.TwicePrecision{Float64}, Int64},
@@ -265,6 +309,30 @@ function expectation_at_time_on_trajectory(
     return expectations_v
 end
 
+"""
+    compute_states_at_times(
+        H::Matrix{ComplexF64},
+        M_l::Vector{Matrix{ComplexF64}},
+        ψ0::Vector{ComplexF64},
+        t_final::Float64,
+        dt::Float64,
+        number_trajectories::Int64,
+        verbose::Bool=false)
+
+Function for external access, computes the states at the specified times (using both the `gillespie` and the `state_at_time_on_trajectory` when appropriate).
+
+# Arguments
+- `H`: system Hamiltonian
+- `M_l`: list of jump operators
+- `ψ0`: initial (pure) state of the system
+- `t_final`: final time of the evolution
+- `dt`: time step for the evolution
+- `number_trajectories`: number of trajectories to be considered
+- `verbose`: if true, gives more output. Verbose=true for large simulations can fill up completely the text buffer and cause a crash
+
+# Returns
+- `results`: list of lists of states along all the trajectories for all the considered times
+"""
 function compute_states_at_times(
     H::Matrix{ComplexF64},
     M_l::Vector{Matrix{ComplexF64}},
@@ -287,6 +355,33 @@ function compute_states_at_times(
     return results
 end
 
+"""
+    compute_expectation_values_at_times(
+        H::Matrix{ComplexF64},
+        M_l::Vector{Matrix{ComplexF64}},
+        E_l::Vector{Matrix{ComplexF64}},
+        ψ0::Vector{ComplexF64},
+        t_final::Float64,
+        dt::Float64,
+        number_trajectories::Int64,
+        verbose::Bool=false)
+
+Function for external access, computes the expectation values of all the required operators at the specified times.
+NOT TESTED
+
+# Arguments
+- `H`: system Hamiltonian
+- `M_l`: list of jump operators
+- `ψ0`: initial (pure) state of the system
+- `t_final`: final time of the evolution
+- `dt`: time step for the evolution
+- `number_trajectories`: number of trajectories to be considered
+- `verbose`: if true, gives more output. Verbose=true for large simulations can fill up completely the text buffer and cause a crash
+
+# Returns
+- `results`: list of lists of expectation values along all the trajectories for all the considered times for all the operators, such that `results[n_traj][n_E][n_t]` is the expectation value for the operator numbered by `n_E` on the trajectory `n_traj` at time `n_t`
+
+"""
 function compute_expectation_values_at_times(
     H::Matrix{ComplexF64},
     M_l::Vector{Matrix{ComplexF64}},
