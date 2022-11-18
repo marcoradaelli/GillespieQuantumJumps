@@ -16,7 +16,7 @@ Verifies whether the library has been imported correctly. When called, prints "T
 - true
 """
 function verify_working()
-    println("The package has been imported correctly, version 0.2")
+    println("The package has been imported correctly, version 0.2b")
     return true
 end
 
@@ -285,7 +285,7 @@ function expectation_at_time_on_trajectory(
             # Cycles over the operators to compute the expectation values.
             for n_E in eachindex(E_l)
                 exp_val = ψ' * E_l[n_E] * ψ
-                expectations_v[n_E][n_t] = exp_val
+                expectations_v[n_E][n_t] = exp_val.re
             end
         end
     end
@@ -302,7 +302,7 @@ function expectation_at_time_on_trajectory(
         # Cycles over the operators to compute the expectation values.
         for n_E in eachindex(E_l)
             exp_val = ψ' * E_l[n_E] * ψ
-            expectations_v[n_E][n_t] = exp_val
+            expectations_v[n_E][n_t] = exp_val.re
         end
     end
 
