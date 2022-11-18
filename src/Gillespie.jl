@@ -86,7 +86,7 @@ function gillespie(
             
             # Sample from the waiting time distribution.
             n_T = sample(1:length(t_range), Weights(Ps))
-            
+                    
             # Increase the absolute time.
             τ += t_range[n_T]
             merge!(dict_jump, Dict("AbsTime" => τ, "TimeSinceLast" => t_range[n_T]))
@@ -106,10 +106,13 @@ function gillespie(
             norm_state = norm(ψ)
             # Renormalize the state.
             ψ = ψ / norm_state
+            merge!(dict_jump, Dict("ψAfter" => ψ))
             
             if verbose
                 println(string(dict_jump))
             end
+            
+            push!(results, dict_jump)
         end
         
         push!(trajectories_results, results)
@@ -126,12 +129,12 @@ function state_at_time_on_trajectory(
 
     # Creates an array of states.
     v_states = Vector{ComplexF64}[]
-
+    
     # Creates an array of jump times.
     jump_times = [trajectory_data[i]["AbsTime"] for i in eachindex(trajectory_data)]
     # Creates an array of states after the jumps.
     ψ_after_jumps = [trajectory_data[i]["ψAfter"] for i in eachindex(trajectory_data)]
-
+    
     # Cycles over the jumps times.
     for n_jump in 1:length(jump_times)-1
         next_jump_time = jump_times[n_jump + 1]
@@ -142,18 +145,20 @@ function state_at_time_on_trajectory(
             ψ = ψ_after_jumps[n_jump]
             n_t = find_nearest(t_range, t_abs - jump_times[n_jump])[1]
             norm = sqrt(ψ' * V[n_t]' * V[n_t] * ψ)
+            ψ = V[n_t] * ψ
             ψ = ψ / norm
             push!(v_states, ψ)
         end
     end
 
-    # Now computes the ξ for all times after the latest jump.
+    # Now computes the state for all times after the latest jump.
     last_jump_absolute_time = last(jump_times)
     relevant_times_after_last_jump = [t for t in relevant_times if t >= last_jump_absolute_time]
     for t_abs in relevant_times_after_last_jump
         ψ = last(ψ_after_jumps)
         n_t = find_nearest(t_range, t_abs - last_jump_absolute_time)[1]
         norm = sqrt(ψ' * V[n_t]' * V[n_t] * ψ)
+        ψ = V[n_t] * ψ
         ψ = ψ / norm
         push!(v_states, ψ)
     end
