@@ -7,11 +7,31 @@ using Plots
 using Polynomials
 using ProgressMeter
 
+"""
+     verify_working()
+     
+Verifies whether the library has been imported correctly. When called, prints "The package has been imported correctly" and returns true.
+
+# Returns
+- true
+"""
 function verify_working()
     println("The package has been imported correctly")
     return true
 end
 
+"""
+    find_nearest(a,x)
+
+Returns the nearest index in array a, assumed sorted, to the value x.
+
+# Arguments
+- `a`: array-like sorted object
+- `x`: number
+
+# Returns
+- `n`: index in `a` of the closest element to `x`.
+"""
 function find_nearest(a,x)
     length(a) > 0 || return 0:-1
     r = searchsorted(a,x)
