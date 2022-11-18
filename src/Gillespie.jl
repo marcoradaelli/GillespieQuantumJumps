@@ -401,7 +401,7 @@ function compute_expectation_values_at_times(
 
     # Holes filling and computation of expectation values.
     @showprogress 1 "Filling in the gaps..." for n_trajectory in eachindex(trajectories_results)
-        v_expectations = expectation_at_times_on_trajectory(t_range, t_range, V, trajectories_results[n_trajectory], E_l)
+        v_expectations = expectation_at_time_on_trajectory(t_range, t_range, V, trajectories_results[n_trajectory], E_l)
         push!(results, v_expectations)
     end
 
