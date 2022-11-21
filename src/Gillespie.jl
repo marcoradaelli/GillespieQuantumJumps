@@ -189,7 +189,7 @@ function state_at_time_on_trajectory(
     t_range::StepRangeLen{Float64, Base.TwicePrecision{Float64}, Base.TwicePrecision{Float64}, Int64},
     relevant_times::StepRangeLen{Float64, Base.TwicePrecision{Float64}, Base.TwicePrecision{Float64}, Int64},
     V::Vector{Matrix{ComplexF64}},
-    trajectory_data::Vector{Dict{String, Any}})
+    trajectory_data::Vector{Dict{String, Any}},)
 
     # Creates an array of states.
     v_states = Vector{ComplexF64}[]
@@ -330,6 +330,7 @@ Function for external access, computes the states at the specified times (using 
 - `dt`: time step for the evolution
 - `number_trajectories`: number of trajectories to be considered
 - `verbose`: if true, gives more output. Verbose=true for large simulations can fill up completely the text buffer and cause a crash
+- `compute_V_each_step`; if true, does not re-use pre-computed values for the no-jump evolution operator at all steps, but computes the operator directly.
 
 # Returns
 - `results`: list of lists of states along all the trajectories for all the considered times
@@ -341,17 +342,34 @@ function compute_states_at_times(
     t_final::Float64,
     dt::Float64,
     number_trajectories::Int64,
-    verbose::Bool=false)
+    verbose::Bool=false,
+    compute_V_each_step=false)
 
     trajectories_results, V, t_range = gillespie(H, M_l, ψ0, t_final, dt, number_trajectories, verbose)
     println()
 
     results = Vector{Vector{ComplexF64}}[]
 
-    @showprogress 1 "Filling in the gaps..." for n_trajectory in eachindex(trajectories_results)
-        v_states = state_at_time_on_trajectory(t_range, t_range, V, trajectories_results[n_trajectory])
-        push!(results, v_states)
+    # Constructs the overall jump operator.
+    J = zero(M_l[1])
+    for M in M_l
+        J += M' * M
     end
+    # Effective (non-Hermitian) Hamiltonian.
+    He = H - 1im/2. * J
+
+    if compute_V_each_step
+        @showprogress 1 "Filling in the gaps..." for n_trajectory in eachindex(trajectories_results)
+            v_states = state_at_time_on_trajectory_recomputing_V(t_range, t_range, trajectories_results[n_trajectory], He)
+            push!(results, v_states)
+        end
+    else
+        @showprogress 1 "Filling in the gaps..." for n_trajectory in eachindex(trajectories_results)
+            v_states = state_at_time_on_trajectory(t_range, t_range, V, trajectories_results[n_trajectory])
+            push!(results, v_states)
+        end
+    end
+    
 
     return results
 end
@@ -407,6 +425,54 @@ function compute_expectation_values_at_times(
     end
 
     return results
+end
+
+
+function state_at_time_on_trajectory_recomputing_V(
+    t_range::StepRangeLen{Float64, Base.TwicePrecision{Float64}, Base.TwicePrecision{Float64}, Int64},
+    relevant_times::StepRangeLen{Float64, Base.TwicePrecision{Float64}, Base.TwicePrecision{Float64}, Int64},
+    trajectory_data::Vector{Dict{String, Any}},
+    He::Matrix{ComplexF64})
+
+    # Creates an array of states.
+    v_states = Vector{ComplexF64}[]
+    
+    # Creates an array of jump times.
+    jump_times = [trajectory_data[i]["AbsTime"] for i in eachindex(trajectory_data)]
+    # Creates an array of states after the jumps.
+    ψ_after_jumps = [trajectory_data[i]["ψAfter"] for i in eachindex(trajectory_data)]
+    
+    # Cycles over the jumps times.
+    for n_jump in 1:length(jump_times)-1
+        next_jump_time = jump_times[n_jump + 1]
+        # Determines the set of relevant times between this jump and the following one.
+        relevant_times_in_interval = [t for t in relevant_times if jump_times[n_jump] <= t < next_jump_time]
+        # Cycles over the relevant times.
+        for t_abs in relevant_times_in_interval
+            ψ = ψ_after_jumps[n_jump]
+            Δt = t_abs - jump_times[n_jump]
+            ev_op = exp(- 1im * He * Δt)
+            norm = sqrt(ψ' * ev_op' * ev_op * ψ)
+            ψ = ev_op * ψ
+            ψ = ψ / norm
+            push!(v_states, ψ)
+        end
+    end
+
+    # Now computes the state for all times after the latest jump.
+    last_jump_absolute_time = last(jump_times)
+    relevant_times_after_last_jump = [t for t in relevant_times if t >= last_jump_absolute_time]
+    for t_abs in relevant_times_after_last_jump
+        ψ = last(ψ_after_jumps)
+        Δt = t_abs - last_jump_absolute_time
+        ev_op = exp(- 1im * He * Δt)
+        norm = sqrt(ψ' * ev_op' * ev_op * ψ)
+        ψ = ev_op * ψ
+        ψ = ψ / norm
+        push!(v_states, ψ)
+    end
+
+    return v_states
 end
 
 end # module
