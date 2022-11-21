@@ -318,7 +318,8 @@ end
         t_final::Float64,
         dt::Float64,
         number_trajectories::Int64,
-        verbose::Bool=false)
+        verbose::Bool=false,
+        compute_V_each_step::Bool=false)
 
 Function for external access, computes the states at the specified times (using both the `gillespie` and the `state_at_time_on_trajectory` when appropriate).
 
