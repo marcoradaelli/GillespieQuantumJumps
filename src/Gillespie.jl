@@ -476,4 +476,134 @@ function state_at_time_on_trajectory_recomputing_V(
     return v_states
 end
 
+"""
+    gillespie_partial_monitoring(
+        H::Matrix{ComplexF64},
+        M_l::Vector{Matrix{ComplexF64}},
+        S_l::Vector{Matrix{ComplexF64}},
+        ρ::Matrix{ComplexF64},
+        t_final::Float64,
+        dt::Float64,
+        number_trajectories::Int64,
+        verbose::Bool=false)
+
+Simulates the jumps, according to the Gillespie algorithm, for the given dynamics, for an initial mixed state.
+
+# Arguments
+- `H`: Hamiltonian matrix
+- `M_l`: list of jump operators corresponding to monitored channels
+- `S_l`: list of jump operators corresponding to un-monitored channels
+- `ρ`: initial state of the system
+- `t_final`: final time of the evolution
+- `dt`: time increment considered
+- `number_trajectories`: number of trajectories of the simulation
+- `verbose`: if true, gives more output. Verbose=true for large simulations can fill up completely the text buffer and cause a crash
+
+# Returns
+- `trajectories_results`: list of dictionaries with each jump channel, times and states after jumps
+- `V`: list of pre-computed no-jump non-Hermitian evolution operators
+- `t_range`: range of times at which the V operators are computed
+"""
+function gillespie_partial_monitoring(
+    H::Matrix{ComplexF64},
+    M_l::Vector{Matrix{ComplexF64}},
+    S_l::Vector{Matrix{ComplexF64}},
+    ρ::Matrix{ComplexF64},
+    t_final::Float64,
+    dt::Float64,
+    number_trajectories::Int64,
+    verbose::Bool=false)
+
+    t_range = 0.:dt:t_final
+
+    # Constructs the overall jump operator.
+    J = zero(M_l[1])
+    for M in M_l
+        J += M' * M
+    end
+    for S in S_l
+        J += S' * S
+    end
+    # Effective (non-Hermitian) Hamiltonian.
+    He = H - 1im/2. * J
+
+    # Constructs the no-jump evolution operators for all the relevant times.
+    V = Matrix{ComplexF64}[] # List of the no-jump evolution operators.
+    Qs = Matrix{ComplexF64}[] # List of the non-state-dependent part of the waiting time distribution.
+    for t in t_range
+        ev_op = exp(-1im * He * t)
+        push!(V, ev_op)
+        nsd_wtd = ev_op' * J * ev_op
+        push!(Qs, nsd_wtd)
+    end
+
+    # Prints the matrix norm for the latest Qs.
+    error = norm(last(Qs))
+    println("-> Truncation error given by norm of latest Qs matrix: " * string(error))
+        
+    # List for the results.
+    trajectories_results = Array{Dict{String, Any}}[]
+
+    # Cycle over the trajectories.
+    @showprogress 1 "Gillespie evolution..." for trajectory in 1:number_trajectories
+        
+        # Initial state.
+        ψ = ψ0
+        # Absolute time.
+        τ = 0
+        
+        results = Dict{String, Any}[]
+        dict_initial = Dict("AbsTime" => 0,
+            "TimeSinceLast" => 0,
+            "JumpChannel" => nothing,
+            "ψAfter" => ψ0)
+        push!(results, dict_initial)
+        
+        while τ < t_final
+            dict_jump = Dict()
+            
+            # Compute the waiting time distribution, exploiting the pre-computed part.
+            Ps = Float64[]
+            for Q in Qs
+                wtd = real(ψ' * Q * ψ)
+                push!(Ps, wtd)
+            end
+            
+            # Sample from the waiting time distribution.
+            n_T = sample(1:length(t_range), Weights(Ps))
+                    
+            # Increase the absolute time.
+            τ += t_range[n_T]
+            merge!(dict_jump, Dict("AbsTime" => τ, "TimeSinceLast" => t_range[n_T]))
+            
+            # Update the state.
+            ψ = V[n_T] * ψ
+            # Chooses where to jump.
+            weights = Float64[]
+            for M in M_l
+                weight = real(ψ' * M' * M * ψ)
+                push!(weights, weight)
+            end
+            n_jump = sample(1:length(M_l), Weights(weights))
+            merge!(dict_jump, Dict("JumpChannel" => n_jump))
+            # Update the state after the jump.
+            ψ = M_l[n_jump] * ψ
+            norm_state = norm(ψ)
+            # Renormalize the state.
+            ψ = ψ / norm_state
+            merge!(dict_jump, Dict("ψAfter" => ψ))
+            
+            if verbose
+                println(string(dict_jump))
+            end
+            
+            push!(results, dict_jump)
+        end
+        
+        push!(trajectories_results, results)
+    end
+
+    return trajectories_results, V, t_range
+end
+
 end # module
