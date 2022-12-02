@@ -7,6 +7,8 @@ using Plots
 using Polynomials
 using ProgressMeter
 
+include("PartialMonitoring.jl")
+
 """
      verify_working() 
      
