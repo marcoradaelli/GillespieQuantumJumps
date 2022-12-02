@@ -476,24 +476,57 @@ function state_at_time_on_trajectory_recomputing_V(
     return v_states
 end
 
+
+"""
+    vectorize(x)
+
+Vectorizes an operator.
+
+# Arguments
+- `x`: operator to be vectorized
+
+# Returns
+- the vectorized form of `x`
+"""
+function vectorize(x)
+    return vec(x)
+end
+
+"""
+    unvectorize(x)
+
+Translates a vectorized operator into the matrix form.
+
+# Arguments
+- `x`; operator in vectorized form
+
+# Returns
+- the operator in matrix form
+"""
+function unvectorize(x)
+    # Assumes the input object to be a reshapable to a square matrix.
+    d = trunc(Int, sqrt(length(x)))
+    return reshape(x, (d,d))
+end
+
 """
     gillespie_partial_monitoring(
         H::Matrix{ComplexF64},
         M_l::Vector{Matrix{ComplexF64}},
         S_l::Vector{Matrix{ComplexF64}},
-        ρ::Matrix{ComplexF64},
+        ρ0::Matrix{ComplexF64},
         t_final::Float64,
         dt::Float64,
         number_trajectories::Int64,
         verbose::Bool=false)
 
-Simulates the jumps, according to the Gillespie algorithm, for the given dynamics, for an initial mixed state.
+Gillespie-based simulation with partial monitoring, and allowing for mixed initial states.
 
 # Arguments
 - `H`: Hamiltonian matrix
-- `M_l`: list of jump operators corresponding to monitored channels
-- `S_l`: list of jump operators corresponding to un-monitored channels
-- `ρ`: initial state of the system
+- `M_l`: list of monitored jump operators
+- `S_l`: list of un-monitored jump operators
+- `ρ0`: initial state of the system
 - `t_final`: final time of the evolution
 - `dt`: time increment considered
 - `number_trajectories`: number of trajectories of the simulation
@@ -508,98 +541,129 @@ function gillespie_partial_monitoring(
     H::Matrix{ComplexF64},
     M_l::Vector{Matrix{ComplexF64}},
     S_l::Vector{Matrix{ComplexF64}},
-    ρ::Matrix{ComplexF64},
+    ρ0::Matrix{ComplexF64},
     t_final::Float64,
     dt::Float64,
     number_trajectories::Int64,
     verbose::Bool=false)
 
+    # Range of times.
     t_range = 0.:dt:t_final
 
-    # Constructs the overall jump operator.
-    J = zero(M_l[1])
+    # M_l is the list of jumps corresponding to monitored channels.
+    # S_l is the list of jumps corresponding to un-monitored channels.
+
+    # Creates the appropriate identity matrix.
+    d = size(H)[1]
+    ide = Matrix{Float64}(I, d, d)
+
+    # Creates the J operator.
+    J = zero(ide)
+    # Cycle over the monitored operators.
     for M in M_l
         J += M' * M
     end
-    for S in S_l
-        J += S' * S
-    end
-    # Effective (non-Hermitian) Hamiltonian.
-    He = H - 1im/2. * J
 
-    # Constructs the no-jump evolution operators for all the relevant times.
-    V = Matrix{ComplexF64}[] # List of the no-jump evolution operators.
-    Qs = Matrix{ComplexF64}[] # List of the non-state-dependent part of the waiting time distribution.
+    # Vectorized version of J.
+    vect_J = vectorize(J)
+
+    # Vectorized form of L_0.
+    # Hamiltonian part.
+    vect_L0 = -1im * kron(ide, H) + 1im * kron(transpose(H), ide)
+    # Cycle over the un-monitored operators.
+    for S in S_l
+        vect_L0 += kron(conj.(S), S) - 0.5 * kron(ide, S' * S) - 0.5 * (transpose(S' * S), ide)
+    end
+    # Cycle over the monitored operators.
+    for M in M_l
+        vect_L0 += - 0.5 * kron(ide, M' * M) - 0.5 * kron(transpose(M' * M), ide)
+    end
+    
+    # Vectorized form of L_0^\dagger.
+    # Hamiltonian part.
+    vect_L0_dagger = 1im * kron(ide, H) - 1im * kron(transpose(H), ide)
+    # Cycle over the un-monitored operators.
+    for S in S_l
+        vect_L0_dagger += kron(transpose(S), S') - 0.5 * kron(transpose(S' * S), ide) - 0.5 * kron(ide, S' * S)
+    end
+    # Cycle over the monitored operators.
+    for M in M_l
+        vect_L0_dagger += - 0.5 * kron(transpose(M' * M), ide) - 0.5 * kron(ide, M' * M)
+    end
+
+    # Pre-computation stage.
+    # Creates the list of the no-jump evolution operators and the non-state dependent part of the waiting time distribution.
+    V = Matrix{ComplexF64}[] 
+    Qs = Matrix{ComplexF64}[]
     for t in t_range
-        ev_op = exp(-1im * He * t)
+        ev_op = exp(vect_L0 * t)
         push!(V, ev_op)
-        nsd_wtd = ev_op' * J * ev_op
+        nsd_wtd = unvectorize(exp(vect_L0_dagger * t) * vect_J)
         push!(Qs, nsd_wtd)
     end
 
-    # Prints the matrix norm for the latest Qs.
-    error = norm(last(Qs))
-    println("-> Truncation error given by norm of latest Qs matrix: " * string(error))
-        
-    # List for the results.
+    # TODO: Some way of quantifying the error (like the norm of the latest Qs in the normal version)
+
+    # Vector for the results of the computation.
     trajectories_results = Array{Dict{String, Any}}[]
 
     # Cycle over the trajectories.
-    @showprogress 1 "Gillespie evolution..." for trajectory in 1:number_trajectories
-        
+    for trajectory in 1:number_trajectories
         # Initial state.
-        ψ = ψ0
+        ρ = ρ0
         # Absolute time.
         τ = 0
-        
+
+        # Creates the array of results for the single trajectory, and pushes the initial state as a fictitious fist jump.
         results = Dict{String, Any}[]
         dict_initial = Dict("AbsTime" => 0,
             "TimeSinceLast" => 0,
             "JumpChannel" => nothing,
-            "ψAfter" => ψ0)
+            "ρAfter" => ρ0)
         push!(results, dict_initial)
-        
-        while τ < t_final
+
+        while τ < t_final 
             dict_jump = Dict()
-            
+
             # Compute the waiting time distribution, exploiting the pre-computed part.
             Ps = Float64[]
             for Q in Qs
-                wtd = real(ψ' * Q * ψ)
+                wtd =  real(tr(Q * ρ))
                 push!(Ps, wtd)
             end
-            
+
             # Sample from the waiting time distribution.
             n_T = sample(1:length(t_range), Weights(Ps))
-                    
+
             # Increase the absolute time.
             τ += t_range[n_T]
             merge!(dict_jump, Dict("AbsTime" => τ, "TimeSinceLast" => t_range[n_T]))
-            
+
             # Update the state.
-            ψ = V[n_T] * ψ
+            vect_ρ = V[n_T] * vectorize(ρ)
+            ρ = unvectorize(vect_ρ)
             # Chooses where to jump.
             weights = Float64[]
             for M in M_l
-                weight = real(ψ' * M' * M * ψ)
+                weight = real(tr(M' * M * ρ))
                 push!(weights, weight)
             end
             n_jump = sample(1:length(M_l), Weights(weights))
             merge!(dict_jump, Dict("JumpChannel" => n_jump))
             # Update the state after the jump.
-            ψ = M_l[n_jump] * ψ
-            norm_state = norm(ψ)
+            ρ = M_l[n_jump] * ρ * (M_l[n_jump])'
+            norm_state = real(tr(ρ))
             # Renormalize the state.
-            ψ = ψ / norm_state
-            merge!(dict_jump, Dict("ψAfter" => ψ))
-            
+            ρ = ρ / norm_state
+            merge!(dict_jump, Dict("ρAfter" => ρ))
+
             if verbose
                 println(string(dict_jump))
             end
-            
+
             push!(results, dict_jump)
         end
-        
+
         push!(trajectories_results, results)
     end
 
