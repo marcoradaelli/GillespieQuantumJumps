@@ -123,6 +123,8 @@ function gillespie_partial_monitoring(
         push!(Qs, nsd_wtd)
     end
 
+    println("Completed precomputation")
+
     # TODO: Some way of quantifying the error (like the norm of the latest Qs in the normal version)
 
     # Vector for the results of the computation.
