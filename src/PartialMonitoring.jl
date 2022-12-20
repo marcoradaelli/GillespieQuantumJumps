@@ -99,6 +99,8 @@ function gillespie_partial_monitoring(
     for M in M_l
         vect_L0 += - 0.5 * kron(ide, M' * M) - 0.5 * kron(transpose(M' * M), ide)
     end
+
+    println("Completed until monitored operators")
     
     # Vectorized form of L_0^\dagger.
     # Hamiltonian part.
