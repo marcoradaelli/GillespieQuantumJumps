@@ -68,6 +68,8 @@ function gillespie_partial_monitoring(
     number_trajectories::Int64,
     verbose::Bool=false)
 
+    println("Starting Gillespie from function")
+
     # Range of times.
     t_range = 0.:dt:t_final
 
