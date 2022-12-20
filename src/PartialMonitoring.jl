@@ -251,6 +251,7 @@ function compute_states_at_times_mixed(
 
 
     trajectories_results, V, t_range = gillespie_partial_monitoring(H, M_l, S_l, ρ0, t_final, dt, number_trajectories, verbose)
+    println("Completed Gillespie")
     println()
 
     results = Vector{Matrix{ComplexF64}}[]
