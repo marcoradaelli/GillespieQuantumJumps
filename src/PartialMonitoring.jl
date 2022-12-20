@@ -98,7 +98,7 @@ function gillespie_partial_monitoring(
     println("Completed until S_l appears")
 
     for S in S_l
-        vect_L0 += kron(conj.(S), S) - 0.5 * kron(ide, S' * S) - 0.5 * (transpose(S' * S), ide)
+        vect_L0 += kron(conj.(S), S) - 0.5 * kron(ide, S' * S) - 0.5 * kron(transpose(S' * S), ide)
     end
     # Cycle over the monitored operators.
     for M in M_l
