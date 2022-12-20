@@ -92,6 +92,9 @@ function gillespie_partial_monitoring(
     # Hamiltonian part.
     vect_L0 = -1im * kron(ide, H) + 1im * kron(transpose(H), ide)
     # Cycle over the un-monitored operators.
+
+    println("Completed until S_l appears")
+
     for S in S_l
         vect_L0 += kron(conj.(S), S) - 0.5 * kron(ide, S' * S) - 0.5 * (transpose(S' * S), ide)
     end
