@@ -69,7 +69,6 @@ function gillespie_partial_monitoring(
     verbose::Bool=false)
 
     println("Starting Gillespie from function")
-    flush(stdout)
 
     # Range of times.
     t_range = 0.:dt:t_final
@@ -97,7 +96,6 @@ function gillespie_partial_monitoring(
     # Cycle over the un-monitored operators.
 
     println("Completed until S_l appears")
-    flush(stdout)
 
     for S in S_l
         vect_L0 += kron(conj.(S), S) - 0.5 * kron(ide, S' * S) - 0.5 * kron(transpose(S' * S), ide)
@@ -108,7 +106,6 @@ function gillespie_partial_monitoring(
     end
 
     println("Completed until monitored operators")
-    flush(stdout)
     
     # Vectorized form of L_0^\dagger.
     # Hamiltonian part.
@@ -134,7 +131,6 @@ function gillespie_partial_monitoring(
     end
 
     println("Completed precomputation")
-    flush(stdout)
 
     # TODO: Some way of quantifying the error (like the norm of the latest Qs in the normal version)
 
@@ -269,7 +265,7 @@ function compute_states_at_times_mixed(
 
     results = Vector{Matrix{ComplexF64}}[]
 
-    @showprogress 1 "Filling in the gaps..." for n_trajectory in eachindex(trajectories_results)
+    for n_trajectory in eachindex(trajectories_results)
         v_states = state_at_time_on_trajectory_mixed(t_range, t_range, V, trajectories_results[n_trajectory])
         push!(results, v_states)
     end
