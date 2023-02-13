@@ -138,7 +138,7 @@ function gillespie_partial_monitoring(
     trajectories_results = Array{Dict{String, Any}}[]
 
     # Cycle over the trajectories.
-    for trajectory in 1:number_trajectories
+    @showprogress 1 "Gillespie evolution..." for trajectory in 1:number_trajectories
         # Initial state.
         ρ = ρ0
         # Absolute time.
