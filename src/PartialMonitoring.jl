@@ -95,7 +95,7 @@ function gillespie_partial_monitoring(
     vect_L0 = -1im * kron(ide, H) + 1im * kron(transpose(H), ide)
     # Cycle over the un-monitored operators.
 
-    println("Completed until S_l appears")
+    display("Completed until S_l appears")
 
     for S in S_l
         vect_L0 += kron(conj.(S), S) - 0.5 * kron(ide, S' * S) - 0.5 * kron(transpose(S' * S), ide)
@@ -105,7 +105,7 @@ function gillespie_partial_monitoring(
         vect_L0 += - 0.5 * kron(ide, M' * M) - 0.5 * kron(transpose(M' * M), ide)
     end
 
-    println("Completed until monitored operators")
+    display("Completed until monitored operators")
     
     # Vectorized form of L_0^\dagger.
     # Hamiltonian part.
@@ -130,7 +130,7 @@ function gillespie_partial_monitoring(
         push!(Qs, nsd_wtd)
     end
 
-    println("Completed precomputation")
+    display("Completed precomputation")
 
     # TODO: Some way of quantifying the error (like the norm of the latest Qs in the normal version)
 
