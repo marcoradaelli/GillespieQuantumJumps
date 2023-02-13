@@ -123,7 +123,7 @@ function gillespie_partial_monitoring(
     # Creates the list of the no-jump evolution operators and the non-state dependent part of the waiting time distribution.
     V = Matrix{ComplexF64}[] 
     Qs = Matrix{ComplexF64}[]
-    for t in t_range
+    @showprogress "Precomputing no-jumps..." for t in t_range
         ev_op = exp(vect_L0 * t)
         push!(V, ev_op)
         nsd_wtd = unvectorize(exp(vect_L0_dagger * t) * vect_J)
